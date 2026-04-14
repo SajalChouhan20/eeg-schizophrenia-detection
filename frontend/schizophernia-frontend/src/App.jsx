@@ -3,6 +3,7 @@ import { useState } from "react";
 function App() {
   const [file, setFile] = useState(null);
   const [result, setResult] = useState("");
+  const [schizophreniaPercentage, setSchizophreniaPercentage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [activeAccordion, setActiveAccordion] = useState(null);
 
@@ -20,6 +21,7 @@ function App() {
     formData.append("file", file);
 
     setResult("");
+    setSchizophreniaPercentage(null);
     setLoading(true);
 
     try {
@@ -32,10 +34,16 @@ function App() {
 
       setLoading(false);
       setResult(data.prediction || data.error);
+      setSchizophreniaPercentage(
+        typeof data.schizophrenia_percentage === "number"
+          ? data.schizophrenia_percentage
+          : null
+      );
 
     } catch (error) {
       setLoading(false);
       setResult("Server Error!");
+      setSchizophreniaPercentage(null);
     }
   };
 
@@ -234,6 +242,11 @@ function App() {
                       <h3 className={`text-4xl font-black ${
                          result.includes("Healthy") ? "text-emerald-400" : "text-rose-400"
                       }`}>{result}</h3>
+                      {schizophreniaPercentage !== null && (
+                        <p className="text-sm text-slate-300 font-semibold">
+                          Schizophrenia likelihood: {schizophreniaPercentage.toFixed(2)}%
+                        </p>
+                      )}
                     </div>
                 </div>
               )}

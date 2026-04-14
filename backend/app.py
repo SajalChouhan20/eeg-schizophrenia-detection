@@ -52,9 +52,27 @@ def predict():
 
     prediction = model.predict([features])[0]
 
+    # Try to estimate schizophrenia probability from the trained model.
+    if hasattr(model, "predict_proba"):
+        probs = model.predict_proba([features])[0]
+        classes = list(model.classes_) if hasattr(model, "classes_") else [0, 1]
+        try:
+            schiz_index = classes.index(1)
+            schizophrenia_percentage = float(probs[schiz_index] * 100)
+        except ValueError:
+            schizophrenia_percentage = float(np.max(probs) * 100)
+    elif hasattr(model, "decision_function"):
+        score = float(model.decision_function([features])[0])
+        schizophrenia_percentage = float((1.0 / (1.0 + np.exp(-score))) * 100)
+    else:
+        schizophrenia_percentage = 100.0 if prediction == 1 else 0.0
+
     result = "🧠 Schizophrenia Detected" if prediction == 1 else "✅ Healthy"
 
-    return jsonify({"prediction": result})
+    return jsonify({
+        "prediction": result,
+        "schizophrenia_percentage": round(schizophrenia_percentage, 2)
+    })
 
 
 if __name__ == "__main__":
