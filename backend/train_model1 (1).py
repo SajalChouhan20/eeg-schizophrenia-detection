@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import joblib
 
 DATA_PATH = "../dataverse_files"
@@ -109,7 +109,7 @@ y = np.array(y)
 
 # Train-test split
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.5, random_state=42, stratify=y
+    X, y, test_size=0.2, random_state=42, stratify=y
 )
 
 # Your original SVM model
@@ -128,8 +128,22 @@ model.fit(X_train, y_train)
 # Prediction
 y_pred = model.predict(X_test)
 
-# Only accuracy
-print("Accuracy:", accuracy_score(y_test, y_pred))
+# ============================================
+# EVALUATION
+# ============================================
+print("\nAccuracy:", accuracy_score(y_test, y_pred))
+
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+print("\nConfusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+
+# Sample Predictions
+print("\nSample Predictions:")
+for i in range(min(10, len(X_test))):
+    print("Actual:", y_test[i], "Predicted:", y_pred[i])
 
 # Save model
 joblib.dump(model, "svm_model.pkl")
