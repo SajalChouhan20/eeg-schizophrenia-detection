@@ -31,12 +31,12 @@ def compute_band_powers(signal, sfreq):
     nperseg = min(int(2 * sfreq), len(signal))
     freqs, psd = welch(signal, fs=sfreq, nperseg=nperseg)
 
-    total_power = np.trapezoid(psd, freqs)
+    total_power = np.trapz(psd, freqs)
     band_powers = []
 
     for (low, high) in FREQ_BANDS.values():
         idx = np.logical_and(freqs >= low, freqs <= high)
-        band_power = np.trapezoid(psd[idx], freqs[idx])
+        band_power = np.trapz(psd[idx], freqs[idx])
         rel_power = band_power / total_power if total_power > 0 else 0
         band_powers.append(rel_power)
 
@@ -46,7 +46,7 @@ def compute_band_powers(signal, sfreq):
 def extract_features(file_path):
     try:
         raw = mne.io.read_raw_edf(file_path, preload=True, verbose=False)
-        data = raw.get_data()
+        data = np.array(raw.get_data())
         sfreq = raw.info["sfreq"]
 
         # Standardize channel count
