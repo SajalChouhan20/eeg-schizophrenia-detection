@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import joblib
 
 DATA_PATH = "../dataverse_files"
@@ -31,12 +31,12 @@ def compute_band_powers(signal, sfreq):
     nperseg = min(int(2 * sfreq), len(signal))
     freqs, psd = welch(signal, fs=sfreq, nperseg=nperseg)
 
-    total_power = np.trapezoid(psd, freqs)
+    total_power = np.trapz(psd, freqs)
     band_powers = []
 
     for (low, high) in FREQ_BANDS.values():
         idx = np.logical_and(freqs >= low, freqs <= high)
-        band_power = np.trapezoid(psd[idx], freqs[idx])
+        band_power = np.trapz(psd[idx], freqs[idx])
         rel_power = band_power / total_power if total_power > 0 else 0
         band_powers.append(rel_power)
 
@@ -46,7 +46,7 @@ def compute_band_powers(signal, sfreq):
 def extract_features(file_path):
     try:
         raw = mne.io.read_raw_edf(file_path, preload=True, verbose=False)
-        data = raw.get_data()
+        data = np.array(raw.get_data())
         sfreq = raw.info["sfreq"]
 
         # Standardize channel count
@@ -109,7 +109,7 @@ y = np.array(y)
 
 # Train-test split
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.5, random_state=42, stratify=y
+    X, y, test_size=0.2, random_state=42, stratify=y
 )
 
 # Your original SVM model
@@ -128,8 +128,22 @@ model.fit(X_train, y_train)
 # Prediction
 y_pred = model.predict(X_test)
 
-# Only accuracy
-print("Accuracy:", accuracy_score(y_test, y_pred))
+# ============================================
+# EVALUATION
+# ============================================
+print("\nAccuracy:", accuracy_score(y_test, y_pred))
+
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+print("\nConfusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+
+# Sample Predictions
+print("\nSample Predictions:")
+for i in range(min(10, len(X_test))):
+    print("Actual:", y_test[i], "Predicted:", y_pred[i])
 
 # Save model
 joblib.dump(model, "svm_model.pkl")
