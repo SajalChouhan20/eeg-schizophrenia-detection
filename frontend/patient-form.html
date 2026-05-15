@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroScan AI — EEG Schizophrenia Screening</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-dark: #1d4ed8;
+      --blue-light: #eff6ff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --green: #16a34a;
+      --green-bg: #f0fdf4;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+      --white: #ffffff;
+      --shadow: 0 4px 24px rgba(37, 99, 235, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .top-bar {
+      background: var(--blue);
+      color: white;
+      padding: 1rem 1.5rem;
+      text-align: center;
+    }
+
+    .top-bar h1 { font-size: 1.35rem; font-weight: 700; }
+    .top-bar p { font-size: 0.85rem; opacity: 0.9; margin-top: 0.25rem; }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 1.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      color: var(--blue);
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--blue-light);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem 1.25rem;
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .form-group.full { grid-column: 1 / -1; }
+
+    label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    label .req { color: var(--red); }
+
+    input, select {
+      padding: 0.65rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    input.invalid, select.invalid { border-color: var(--red); }
+
+    .file-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      text-align: center;
+      background: var(--blue-light);
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .file-zone:hover, .file-zone.has-file {
+      border-color: var(--blue);
+    }
+
+    .file-zone input { display: none; }
+    .file-zone p { color: var(--muted); font-size: 0.9rem; margin-top: 0.5rem; }
+    .file-zone .filename { color: var(--blue); font-weight: 600; margin-top: 0.5rem; }
+
+    .btn-primary {
+      width: 100%;
+      padding: 0.9rem;
+      background: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: background 0.2s;
+    }
+
+    .btn-primary:hover:not(:disabled) { background: var(--blue-dark); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .spinner-wrap {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .spinner-wrap.active { display: flex; }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--blue-light);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #results { display: none; }
+    #results.visible { display: block; }
+
+    .result-card {
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .result-card.healthy {
+      background: var(--green-bg);
+      border: 2px solid #86efac;
+      color: var(--green);
+    }
+
+    .result-card.schizophrenia {
+      background: var(--red-bg);
+      border: 2px solid #fca5a5;
+      color: var(--red);
+    }
+
+    .result-card .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .result-card .title { font-size: 1.5rem; font-weight: 800; }
+    .result-card .confidence { font-size: 1rem; margin-top: 0.5rem; opacity: 0.9; }
+
+    .chart-wrap {
+      position: relative;
+      height: 280px;
+      margin: 1rem 0;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .data-table th {
+      background: var(--blue);
+      color: white;
+      padding: 0.65rem 0.5rem;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    .data-table td {
+      padding: 0.55rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table tr:nth-child(even) { background: #f8fafc; }
+    .data-table td.abnormal { color: var(--red); font-weight: 700; }
+
+    .table-scroll { overflow-x: auto; }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      background: white;
+      color: var(--blue);
+      border: 2px solid var(--blue);
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+
+    .btn-secondary:hover { background: var(--blue-light); }
+    .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .error-banner {
+      display: none;
+      background: var(--red-bg);
+      color: var(--red);
+      border: 1px solid #fca5a5;
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+
+    .error-banner.visible { display: block; }
+
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .container { padding: 1rem; }
+      .card { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top-bar">
+    <h1>NeuroScan AI</h1>
+    <p>EEG-Based Schizophrenia Screening System</p>
+  </header>
+
+  <main class="container">
+    <div id="errorBanner" class="error-banner" role="alert"></div>
+
+    <form id="patientForm" class="card" novalidate>
+      <h2>Patient Information</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="patientName">Patient Name <span class="req">*</span></label>
+          <input type="text" id="patientName" name="patientName" required autocomplete="name" />
+        </div>
+        <div class="form-group">
+          <label for="patientAge">Age <span class="req">*</span></label>
+          <input type="number" id="patientAge" name="patientAge" min="1" max="120" required />
+        </div>
+        <div class="form-group">
+          <label for="patientGender">Gender <span class="req">*</span></label>
+          <select id="patientGender" name="patientGender" required>
+            <option value="">Select gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="patientId">Patient ID <span class="req">*</span></label>
+          <input type="text" id="patientId" name="patientId" required />
+        </div>
+        <div class="form-group">
+          <label for="referringDoctor">Referring Doctor <span class="req">*</span></label>
+          <input type="text" id="referringDoctor" name="referringDoctor" required />
+        </div>
+        <div class="form-group">
+          <label for="doctorEmail">Doctor Email <span class="req">*</span></label>
+          <input type="email" id="doctorEmail" name="doctorEmail" required />
+        </div>
+        <div class="form-group full">
+          <label for="hospital">Hospital / Clinic <span class="req">*</span></label>
+          <input type="text" id="hospital" name="hospital" required />
+        </div>
+        <div class="form-group">
+          <label for="testDate">Date of Test <span class="req">*</span></label>
+          <input type="date" id="testDate" name="testDate" required readonly />
+        </div>
+      </div>
+
+      <h2 style="margin-top: 1.75rem;">EEG Recording</h2>
+      <label class="file-zone" id="fileZone">
+        <input type="file" id="eegFile" name="file" accept=".edf,.EDF" required />
+        <strong>Upload EEG file (.edf only)</strong>
+        <p>Click or drag and drop your EDF file here</p>
+        <p class="filename" id="fileName"></p>
+      </label>
+
+      <button type="submit" class="btn-primary" id="submitBtn">Analyze EEG &amp; Generate Results</button>
+
+      <div class="spinner-wrap" id="loadingState">
+        <div class="spinner"></div>
+        <p><strong>Analyzing EEG data…</strong></p>
+        <p style="color: var(--muted); font-size: 0.9rem;">Extracting features and running SVM classification. This may take a minute.</p>
+      </div>
+    </form>
+
+    <section id="results">
+      <div class="card">
+        <h2>Prediction Result</h2>
+        <div id="resultCard" class="result-card"></div>
+        <button type="button" class="btn-secondary" id="downloadReportBtn">Download Report (PDF)</button>
+      </div>
+
+      <div class="card">
+        <h2>Band Power Analysis</h2>
+        <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.75rem;">Average relative power across all 19 EEG channels</p>
+        <div class="chart-wrap">
+          <canvas id="bandChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Channel Summary</h2>
+        <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.75rem;">Abnormal skewness (|value| &gt; 2) or kurtosis (|value| &gt; 7) highlighted in red</p>
+        <div class="table-scroll">
+          <table class="data-table" id="channelTable">
+            <thead>
+              <tr>
+                <th>Channel</th>
+                <th>Mean</th>
+                <th>Std Dev</th>
+                <th>Skewness</th>
+                <th>Kurtosis</th>
+              </tr>
+            </thead>
+            <tbody id="channelTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <button type="button" class="btn-primary" id="newAnalysisBtn" style="margin-bottom: 2rem;">New Analysis</button>
+    </section>
+  </main>
+
+  <footer>
+    AI screening tool only. Not a substitute for clinical diagnosis.
+  </footer>
+
+  <script>
+    const API_BASE = window.location.origin.includes("5000")
+      ? window.location.origin
+      : "http://127.0.0.1:5000";
+
+    let bandChartInstance = null;
+    let lastAnalysisResult = null;
+
+    const form = document.getElementById("patientForm");
+    const errorBanner = document.getElementById("errorBanner");
+    const loadingState = document.getElementById("loadingState");
+    const submitBtn = document.getElementById("submitBtn");
+    const resultsSection = document.getElementById("results");
+    const eegFileInput = document.getElementById("eegFile");
+    const fileNameEl = document.getElementById("fileName");
+    const fileZone = document.getElementById("fileZone");
+    const testDateInput = document.getElementById("testDate");
+
+    testDateInput.value = new Date().toISOString().split("T")[0];
+
+    eegFileInput.addEventListener("change", () => {
+      const file = eegFileInput.files[0];
+      if (file) {
+        if (!file.name.toLowerCase().endsWith(".edf")) {
+          showError("Only .edf EEG files are accepted.");
+          eegFileInput.value = "";
+          fileNameEl.textContent = "";
+          fileZone.classList.remove("has-file");
+          return;
+        }
+        fileNameEl.textContent = file.name;
+        fileZone.classList.add("has-file");
+      } else {
+        fileNameEl.textContent = "";
+        fileZone.classList.remove("has-file");
+      }
+    });
+
+    function showError(message) {
+      errorBanner.textContent = message;
+      errorBanner.classList.add("visible");
+    }
+
+    function hideError() {
+      errorBanner.classList.remove("visible");
+      errorBanner.textContent = "";
+    }
+
+    function validateForm() {
+      hideError();
+      let valid = true;
+      const fields = form.querySelectorAll("input[required], select[required]");
+
+      fields.forEach((field) => {
+        if (field.id === "eegFile") return;
+        field.classList.remove("invalid");
+        if (!field.value.trim()) {
+          field.classList.add("invalid");
+          valid = false;
+        }
+      });
+
+      const email = document.getElementById("doctorEmail");
+      if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+        email.classList.add("invalid");
+        showError("Please enter a valid doctor email address.");
+        return false;
+      }
+
+      if (!eegFileInput.files[0]) {
+        showError("Please upload an EEG .edf file.");
+        valid = false;
+      } else if (!eegFileInput.files[0].name.toLowerCase().endsWith(".edf")) {
+        showError("Only .edf EEG files are accepted.");
+        valid = false;
+      }
+
+      if (!valid) {
+        showError("Please complete all required fields before submitting.");
+      }
+      return valid;
+    }
+
+    function setLoading(isLoading) {
+      loadingState.classList.toggle("active", isLoading);
+      submitBtn.disabled = isLoading;
+      form.querySelectorAll("input, select, button").forEach((el) => {
+        if (el.id !== "submitBtn") el.disabled = isLoading;
+      });
+    }
+
+    function isAbnormalSkew(v) { return Math.abs(v) > 2; }
+    function isAbnormalKurt(v) { return Math.abs(v) > 7; }
+
+    function renderResults(data) {
+      lastAnalysisResult = data;
+      const healthy = data.prediction === "Healthy";
+      const resultCard = document.getElementById("resultCard");
+
+      resultCard.className = "result-card " + (healthy ? "healthy" : "schizophrenia");
+      resultCard.innerHTML = `
+        <div class="icon">${healthy ? "✅" : "⚠️"}</div>
+        <div class="title">${healthy ? "Healthy" : "Schizophrenia Detected"}</div>
+        <div class="confidence">Confidence: ${Number(data.confidence).toFixed(1)}%</div>
+      `;
+
+      const bands = ["delta", "theta", "alpha", "beta", "gamma"];
+      const bandLabels = ["Delta", "Theta", "Alpha", "Beta", "Gamma"];
+      const bandValues = bands.map((b) => (data.band_powers[b] || 0) * 100);
+
+      if (bandChartInstance) bandChartInstance.destroy();
+      const ctx = document.getElementById("bandChart").getContext("2d");
+      bandChartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: bandLabels,
+          datasets: [{
+            label: "Relative Power (%)",
+            data: bandValues,
+            backgroundColor: [
+              "rgba(37, 99, 235, 0.75)",
+              "rgba(59, 130, 246, 0.75)",
+              "rgba(96, 165, 250, 0.75)",
+              "rgba(147, 197, 253, 0.85)",
+              "rgba(191, 219, 254, 0.9)",
+            ],
+            borderColor: "#2563eb",
+            borderWidth: 1,
+            borderRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.parsed.y.toFixed(2)}% relative power`,
+              },
+            },
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100,
+              title: { display: true, text: "Relative Power (%)" },
+            },
+          },
+        },
+      });
+
+      const tbody = document.getElementById("channelTableBody");
+      tbody.innerHTML = "";
+      (data.channel_features || []).forEach((ch) => {
+        const tr = document.createElement("tr");
+        const skewBad = isAbnormalSkew(ch.skewness);
+        const kurtBad = isAbnormalKurt(ch.kurtosis);
+        tr.innerHTML = `
+          <td><strong>${ch.channel}</strong></td>
+          <td>${Number(ch.mean).toExponential(4)}</td>
+          <td>${Number(ch.std).toExponential(4)}</td>
+          <td class="${skewBad ? "abnormal" : ""}">${Number(ch.skewness).toFixed(4)}</td>
+          <td class="${kurtBad ? "abnormal" : ""}">${Number(ch.kurtosis).toFixed(4)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      resultsSection.classList.add("visible");
+      resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!validateForm()) return;
+
+      hideError();
+      setLoading(true);
+      resultsSection.classList.remove("visible");
+
+      const formData = new FormData(form);
+      formData.set("testDate", testDateInput.value);
+
+      try {
+        const response = await fetch(`${API_BASE}/predict`, {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Analysis failed. Please try again.");
+        }
+
+        renderResults(data);
+      } catch (err) {
+        showError(err.message || "Server error. Is the Flask backend running?");
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    document.getElementById("downloadReportBtn").addEventListener("click", async () => {
+      if (!lastAnalysisResult) return;
+
+      const btn = document.getElementById("downloadReportBtn");
+      btn.disabled = true;
+      btn.textContent = "Generating PDF…";
+
+      try {
+        const response = await fetch(`${API_BASE}/generate-report`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            patient_info: lastAnalysisResult.patient_info,
+            prediction: lastAnalysisResult.prediction,
+            confidence: lastAnalysisResult.confidence,
+            band_powers: lastAnalysisResult.band_powers,
+            band_powers_pct: lastAnalysisResult.band_powers_pct,
+            channel_features: lastAnalysisResult.channel_features,
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || "Report generation failed.");
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `NeuroScan_Report_${Date.now()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Download Report (PDF)";
+      }
+    });
+
+    document.getElementById("newAnalysisBtn").addEventListener("click", () => {
+      resultsSection.classList.remove("visible");
+      lastAnalysisResult = null;
+      form.reset();
+      testDateInput.value = new Date().toISOString().split("T")[0];
+      fileNameEl.textContent = "";
+      fileZone.classList.remove("has-file");
+      hideError();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  </script>
+</body>
+</html>
